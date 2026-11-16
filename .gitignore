@@ -1,0 +1,26 @@
+# Athlete data and recordings never belong in source control.
+/data/
+/README.txt
+*.fit
+*.FIT
+*.tcx
+*.gpx
+*.zip
+*.png
+*.jpg
+*.jpeg
+# Local credentials and environments.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+node_modules/
+*.log
+*.pid
+.DS_Store

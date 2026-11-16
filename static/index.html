@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17263d"><title>Long View · Your riding, in perspective</title>
+<link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="/" aria-label="Long View home"><span class="brand-mark">↗</span><span>LONG VIEW<small>YOUR RIDING, IN PERSPECTIVE</small></span></a>
+  <div class="nav-label">WORKSPACE</div>
+  <button class="nav-item active" data-page="progress"><span>◷</span> Am I improving?</button>
+  <button class="nav-item" data-page="ride"><span>↗</span> Explore a ride</button>
+  <button class="nav-item" data-page="library"><span>▤</span> Ride library <b id="nav-count"></b></button>
+  <div class="sidebar-note"><span class="live-dot"></span> LOCAL &amp; PRIVATE<p>Your recordings stay on this computer.</p><button class="text-button" id="data-button">Data &amp; model settings ↗</button></div>
+</aside>
+<main>
+ <header class="topbar"><div><span class="eyebrow" id="page-eyebrow">THE BIG PICTURE</span><h1 id="page-title">Am I getting better?</h1></div><button class="button secondary" id="sync-button"><span>↻</span> Data &amp; downloads</button></header>
+ <div id="load-error" class="notice error" hidden></div>
+ <div class="filterbar">
+  <label>Long ride <select id="cutoff"><option value="120">120+ minutes</option><option value="90">90+ minutes</option></select></label>
+  <label>Comparison <select id="period"><option value="42">42 days</option><option value="90" selected>90 days</option><option value="all">All previous rides</option></select></label>
+  <label>Effort <select id="effort-duration" aria-label="Effort duration"></select></label>
+  <span class="combined"><span class="tiny-circle"></span> Indoor + outdoor together</span>
+  <span class="coverage" id="coverage">Loading local history…</span>
+ </div>
+ <section id="progress-page" class="page">
+  <div class="intro"><div><h2 id="progress-headline">Looking beyond FTP.</h2><p id="progress-description">Four complementary views of your recorded riding performance.</p></div><span class="pill" id="period-label"></span></div>
+  <div class="metrics" id="progress-metrics"></div>
+  <section class="panel">
+   <div class="panel-heading"><div><h2 id="trend-title">Performance over time</h2><p id="trend-description"></p></div><span class="pill neutral">Baseline = 100</span></div>
+   <div id="trend-chart" class="chart large" role="img" aria-label="Relative performance over time"></div>
+   <div class="chart-footer"><span class="legend-key grey"></span> Individual ride <span class="legend-key blue"></span> Recent strongest-three median <span class="legend-key dashed"></span> Reference period <span class="spacer"></span><span>Click a ride to explore it</span></div>
+  </section>
+  <div class="bottom-grid">
+   <section class="panel"><div class="panel-heading"><div><h2>What counts as progress?</h2><p>The same rider, different ways to improve.</p></div></div>
+    <div class="definition"><b>01</b><div><strong>More power across durations</strong><p>Compare short, sustained and repeated efforts with your own history.</p></div></div>
+    <div class="definition"><b>02</b><div><strong>More useful work late</strong><p>Look at what you produced after the same accumulated workload.</p></div></div>
+    <div class="definition"><b>03</b><div><strong>Greater repeatability</strong><p>More hard minutes and stronger repeated blocks, beyond a single peak.</p></div></div>
+   </section>
+   <section class="panel"><div class="panel-heading"><div><h2>Your latest long ride</h2><p id="latest-context"></p></div></div><div id="latest-summary"></div><button class="button primary" id="latest-button">Explore this ride <span>→</span></button></section>
+  </div>
+  <p class="page-note">These are observed performance signals, not a fitness diagnosis. Routes, intent and opportunities to ride hard affect each ride. A comfortable endurance ride is not a failed power test.</p>
+ </section>
+ <section id="ride-page" class="page" hidden>
+  <div class="ride-picker"><label>Selected ride<select id="ride-select"></select></label><div id="ride-source"></div></div>
+  <div class="intro"><div><h2 id="ride-headline"></h2><p id="ride-description"></p></div><button class="button secondary" id="ride-notes-button">Add effort context</button></div>
+  <div id="not-modeled" class="notice" hidden></div>
+  <div id="ride-content">
+   <div id="ride-context" class="notice" hidden></div>
+   <div id="ride-observation" class="notice" hidden></div>
+   <div class="metrics" id="ride-metrics"></div>
+   <section class="panel">
+    <div class="panel-heading"><div><h2>Where did this ride stand out?</h2><p>Power at each duration, relative to your preceding comparison rides.</p></div>
+     <div class="segmented" id="curve-mode"><button data-mode="p90" class="selected">Exposure</button><button data-mode="best">Best</button><button data-mode="repeated">Repeated</button><button data-mode="late">Late</button><button data-mode="loaded">Under load</button></div></div>
+    <div id="profile-chart" class="chart profile" role="img" aria-label="Power differences across effort durations"></div>
+    <p class="helper" id="profile-helper"></p>
+   </section>
+   <div class="bottom-grid equal">
+    <section class="panel">
+     <div class="panel-heading"><div><h2>Power after work</h2><p id="durability-description"></p></div><label class="compact-label">Effort<select id="late-duration" aria-label="Power after work effort duration"></select></label></div>
+     <div class="segmented inline-control" id="load-view"><button data-view="work" class="selected">After work</button><button data-view="fatigue">After modeled load</button></div>
+     <div id="durability-chart" class="chart" role="img" aria-label="Power retained after accumulated work"></div>
+     <div class="chart-footer"><span class="legend-key blue"></span> This ride <span class="legend-key grey"></span> Your comparison rides</div>
+     <p class="helper" id="durability-helper">Indexed to each ride’s best effort at that duration. Later climbs and pacing affect the opportunity to produce power; a lower point is not proof of fatigue.</p>
+    </section>
+    <section class="panel">
+     <div class="panel-heading"><div><h2>Work across power levels</h2><p>Time accumulated at each power, compared with your history.</p></div></div>
+     <div class="segmented inline-control" id="exposure-view"><button data-view="all" class="selected">All power</button><button data-view="hard">Above FTP</button></div>
+     <div id="exposure-chart" class="chart" role="img" aria-label="Hard-effort exposure compared with prior rides"></div>
+     <div class="chart-footer"><span class="legend-key blue"></span> This ride <span class="legend-key grey"></span> Your comparison rides</div>
+     <p class="helper">Minutes per moving hour. Indoor and outdoor threshold references differ; aerobic watts are not converted between environments.</p>
+    </section>
+   </div>
+   <section class="panel">
+    <div class="panel-heading"><div><h2>The ride, with recovery intact</h2><p id="timeline-description"></p></div><select id="timeline-mode" aria-label="Timeline measure"><option value="power">Recorded power</option><option value="slow">Accumulated load</option><option value="fast">Recent hard-effort load</option></select></div>
+    <div id="timeline-chart" class="chart large" role="img" aria-label="Ride timeline with stops"></div>
+    <p class="helper" id="timeline-helper">Shaded periods are stops. Every gap stays on the elapsed clock and permits recovery automatically.</p>
+   </section>
+   <details class="panel details"><summary>Detailed comparison &amp; model context</summary><div id="detail-table"></div><p class="helper">Repeated power is the mean of the strongest three non-overlapping blocks. They can be parts of the same long effort, not necessarily three intentional repetitions. Fatigue indices use nonlinear effort cost and separate fast/slow recovery, with zero initial within-ride load. They are experimental and do not measure your physiological fatigue directly.</p></details>
+  </div>
+ </section>
+ <section id="library-page" class="page" hidden>
+  <div class="intro"><div><h2>Your long-ride history</h2><p id="library-description"></p></div><input id="search" type="search" placeholder="Search a ride or date…" aria-label="Search rides"></div>
+  <div class="panel table-wrap"><table class="ride-table"><thead><tr><th>Date &amp; ride</th><th>Time</th><th>Environment</th><th>Recording</th><th></th></tr></thead><tbody id="library-rows"></tbody></table></div>
+ </section>
+ <footer>LONG VIEW <span>Built around your own history. No single FTP number. No invented overall fitness score.</span></footer>
+</main>
+<dialog id="settings-dialog">
+ <form method="dialog" class="dialog-header"><div><span class="eyebrow">LOCAL WORKSPACE</span><h2>Data &amp; model settings</h2></div><button class="icon-button" aria-label="Close">×</button></form>
+ <div class="dialog-body">
+  <div id="data-status" class="notice"></div>
+  <h3>Download from Intervals</h3><p>Download once and keep the recordings locally. Your API key stays in this running local server’s memory.</p>
+  <form id="connect-form"><label>API key<input id="api-key" type="password" autocomplete="off" placeholder="Enter locally — never sent to a cloud app"></label><label>Athlete ID<input id="athlete-id" value="0"><small>0 uses your authenticated athlete. You can also enter your athlete ID.</small></label><button class="button primary" type="submit">Download &amp; update history</button><a href="https://intervals.icu/settings" target="_blank" rel="noreferrer">Find your API key in Intervals settings ↗</a></form>
+  <div id="job-status" class="notice" hidden></div>
+  <hr><h3>Import original recordings</h3><p>Import a FIT file or ZIP export. Matching rides are updated locally rather than duplicated.</p><input id="file-import" type="file" accept=".fit,.zip" multiple aria-label="Import original FIT or ZIP files"><div id="import-status" aria-live="polite"></div>
+  <hr><h3>One history, two intensity references</h3><p>These references affect the cost of hard work. They never multiply or convert your recorded watts.</p>
+  <form id="model-form"><div class="form-grid"><label>Indoor threshold reference (W)<input id="indoor-ftp" type="number" min="50" max="500"></label><label>Outdoor threshold reference (W)<input id="outdoor-ftp" type="number" min="50" max="500"></label></div>
+  <details><summary>Experimental fatigue parameters</summary><p>The aerobic component uses a shared absolute-power reference. Extra cost rises near 80% of the environment’s threshold, then increases nonlinearly. This proposed model is not a fitted physiological measurement.</p><div class="form-grid"><label>Shared aerobic reference (W)<input id="aerobic-reference" type="number" min="50" max="500"></label><label>Near-threshold cost exponent<input id="exponent" type="number" min="1" max="6" step=".25"></label><label>Slow recovery time (minutes)<input id="slow-tau" type="number" min="30" max="1000"></label><label>Fast recovery at zero power (seconds)<input id="fast-tau" type="number" min="30" max="1000"></label></div></details>
+  <button class="button secondary" type="submit">Apply locally &amp; recalculate</button><div id="model-status" aria-live="polite"></div></form>
+  <p class="helper">All elapsed recording gaps are stops. Recovery is automatic; stops contribute zero power to elapsed-duration efforts. No confirmation is needed. This app never changes your Intervals training plan or settings.</p>
+ </div>
+</dialog>
+<dialog id="notes-dialog"><form id="notes-form"><div class="dialog-header"><h2>Effort context</h2><button class="icon-button" type="button" id="close-notes" aria-label="Close">×</button></div><div class="dialog-body"><p>Make comparisons easier to interpret. This stays in your local app.</p><label>Ride intent<select id="ride-intent"><option value="unspecified">Not specified</option><option value="endurance">Easy / endurance</option><option value="intervals">Intervals / hard efforts</option><option value="race">Race / maximal effort</option><option value="mixed">Mixed / group ride</option></select></label><label>RPE, 0–10<input id="ride-rpe" type="number" min="0" max="10" step=".5" placeholder="Optional"></label><button class="button primary" type="submit">Save context</button></div></form></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+</body></html>
