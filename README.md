@@ -41,7 +41,7 @@ Choose **3, 5, 8, 10, 15, 20, 30, 45 or 60 minutes**. Selection updates power an
 
 | View | Meaning |
 | --- | --- |
-| **Exposure** | The 90th percentile of rolling average power. About 10% of valid windows reach that power or higher. Overlapping windows describe exposure, not independent repetitions. |
+| **Exposure** | The power cutoff for the strongest 10% of rolling averages at that duration. See the example below. |
 | **Best** | Highest observed rolling average power at that duration. |
 | **Repeated** | Mean of the strongest three greedily selected, non-overlapping blocks. All three must exist; they can be pieces of one longer effort. |
 | **Late** | Best window **starting after 500 kJ of recorded mechanical work**. It can include a hard block; it does not necessarily mean the final hour. |
@@ -51,13 +51,33 @@ Choose **3, 5, 8, 10, 15, 20, 30, 45 or 60 minutes**. Selection updates power an
 
 The separate **Repeated 3-min power** marker stays fixed at three minutes. **Repeatability** counts all minutes above FTP per moving hour; it does not count intentional intervals.
 
+### Exposure: a worked example
+
+For the **5-minute** row, imagine moving a five-minute frame through the ride, one second at a time: 0:00–5:00, 0:01–5:01, 0:02–5:02, and so on. Calculate average power inside each frame, then sort all those averages from lowest to highest.
+
+- **Best** picks the single highest average.
+- **Exposure** picks the cutoff where the strongest 10% of those averages begin. Statistically, this is the 90th percentile.
+
+For two hypothetical rides of the same length:
+
+| | Ride A | Ride B |
+| --- | --- | --- |
+| Best 5-minute power | 200 W | 200 W |
+| 5-minute Exposure | 140 W | 170 W |
+
+Both reached the same peak. Ride B's strongest tenth of five-minute averages starts at a higher power. This helps show high-power work beyond one standout peak.
+
+If the chart says **+10%** on the 5-minute Exposure row, this ride's cutoff was 10% higher than the median cutoff of the comparison rides. It does **not** mean 10% more hard minutes.
+
+The frames overlap: one long hard effort contributes many strong averages. Exposure therefore cannot count repetitions or tell you how many separate hard minutes you rode. Extending a ride with easy time can also lower Exposure even when the hard work is identical. Use **Repeated** for three separate blocks and **Work across power levels** for accumulated time above a wattage.
+
 ## Comparisons
 
-Long rides default to **120+ moving minutes**, with a 90-minute option. Ride view uses strictly earlier modeled rides in the selected 42-day, 90-day or entire-history window. Percent change uses their median:
+Long rides default to **120+ moving minutes**, with a 90-minute option. Ride view uses strictly earlier modeled rides in the selected 42-day, 90-day or entire-history window. Let *x* be this ride's value and *b* the median value of those comparison rides:
 
-$$
-\Delta=100\left(\frac{x}{\operatorname{median}(x_{\mathrm{prior}})}-1\right).
-$$
+```math
+\Delta=100\left(\frac{x}{b}-1\right).
+```
 
 The overview compares the median of each period's strongest three rides with the preceding equal-length period. “All previous rides” splits the overview into earlier and later halves. Coverage and sample counts matter: catalog-only activities cannot supply power curves.
 
@@ -65,32 +85,32 @@ The overview compares the median of each period's strongest three rides with the
 
 For one-second measured power $P_t$, rolling power and accumulated work are:
 
-$$
-\bar P_d(s)=\frac{1}{d}\sum_{t=s}^{s+d-1}P_t,
-\qquad K(s)=\frac{1}{1000}\sum_{t<s}P_t.
-$$
+```math
+\bar{P}_d(s)=\frac{1}{d}\sum_{t=s}^{s+d-1}P_t,
+\qquad K(s)=\frac{1}{1000}\sum_{t=0}^{s-1}P_t.
+```
 
 Windows containing unknown power are excluded. Stops contribute zero watts.
 
 Experimental workload cost combines shared aerobic reference $A$, environment-specific FTP reference $F$, and exponent $q$:
 
-$$
+```math
 C_t=(P_t/A)^2+\left[\frac{\max(0,P_t/F-0.8)}{0.2}\right]^q.
-$$
+```
 
 The slow state accumulates cost and decays exponentially. The fast state accumulates above-FTP work and recovers below FTP:
 
-$$
+```math
 S_{t+1}=aS_t+\tau_s(1-a)C_t,\qquad a=e^{-1/(60\tau_s)},
-$$
+```
 
-$$
+```math
 R_{t+1}=\begin{cases}
 R_t+(P_t-F)/1000,&P_t>F,\\
 R_t\exp\left[-\frac{1}{\tau_f(1+4(P_t/F)^2)}\right],&P_t\le F.
 \end{cases}
 \qquad B_t=S_t/30+R_t/5.
-$$
+```
 
 Here $\tau_s$ is in minutes and $\tau_f$ in seconds. Burden is evaluated **at the effort's start**, with zero initial within-ride load. Constants are exploratory, not fitted physiology. Example settings: indoor/outdoor FTP 185/203 W, aerobic reference 140 W, $q=3$, $\tau_s=240$, $\tau_f=120$. Configure these for the athlete.
 
