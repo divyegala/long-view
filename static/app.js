@@ -2,19 +2,20 @@
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const EFFORT_DURATIONS=[180,300,480,600,900,1200,1800,2700,3600];
 function savedEffort(){try{const d=Number(localStorage.getItem('long-view-effort'));return EFFORT_DURATIONS.includes(d)?d:1200;}catch{return 1200;}}
-const S={data:null,models:new Map(),page:'progress',metric:'sustained',effort:savedEffort(),selected:null,mode:'p90',loadView:'work',exposureView:'all',period:90,cutoff:120};
+function savedAfterHour(){try{const h=Number(localStorage.getItem('long-view-after-hour'));return Number.isInteger(h)&&h>=1&&h<=168?h:1;}catch{return 1;}}
+const S={data:null,models:new Map(),page:'progress',metric:'sustained',effort:savedEffort(),afterHour:savedAfterHour(),selected:null,mode:'best',loadView:'time',powerView:'all',period:90,cutoff:120};
 const METRICS={short:{title:'Repeated 3-min power',icon:'↗',caption:'Mean of your strongest three 3-min blocks',unit:'W'},
  sustained:{get title(){return S.effort/60+'-min power';},icon:'⏱',get caption(){return 'Best '+S.effort/60+'-min effort';},unit:'W'},
  repeatability:{title:'Repeatability',icon:'≋',caption:'Minutes above threshold per moving hour',unit:'min/h'},
- late:{get title(){return 'Late '+S.effort/60+'-min power';},icon:'↝',get caption(){return 'Best '+S.effort/60+'-min effort starting after 500 kJ';},unit:'W'}};
-function metricValue(a,key){if(!a)return null;if(key==='sustained'||key==='late'){const c=a.curves.find(x=>x.seconds===S.effort);return key==='late'?c?.after_work['500']??null:c?.best??null;}return a.metrics[key];}
+ late:{get title(){return 'Late '+S.effort/60+'-min power';},icon:'↝',get caption(){return 'Best '+S.effort/60+'-min effort starting after '+S.afterHour+'h elapsed';},unit:'W'}};
+function metricValue(a,key){if(!a)return null;if(key==='sustained'||key==='late'){const c=a.curves.find(x=>x.seconds===S.effort);return key==='late'?c?.after_hours[String(S.afterHour)]??null:c?.best??null;}return a.metrics[key];}
 function setEffort(value){const d=Number(value);if(!EFFORT_DURATIONS.includes(d))return;S.effort=d;try{localStorage.setItem('long-view-effort',String(d));}catch{}syncEffort();render();}
 function syncEffort(){$$('#effort-duration, #late-duration').forEach(el=>{el.innerHTML=EFFORT_DURATIONS.map(d=>'<option value="'+d+'">'+d/60+' min</option>').join('');el.value=String(S.effort);});}
+function syncAfterHour(){const max=Math.max(1,S.afterHour,...Array.from(S.models.values(),a=>Math.floor(a.elapsed_seconds/3600)));$('#after-hour').innerHTML=Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'">After '+(i+1)+'h</option>').join('');$('#after-hour').value=String(S.afterHour);}
 const NS='http://www.w3.org/2000/svg';
 function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function ok(x){return typeof x==='number'&&Number.isFinite(x);}
 function median(xs){xs=xs.filter(ok).sort((a,b)=>a-b);return xs.length?(xs[Math.floor((xs.length-1)/2)]+xs[Math.ceil((xs.length-1)/2)])/2:null;}
-function quantile(xs,q){xs=xs.filter(ok).sort((a,b)=>a-b);if(!xs.length)return null;const i=(xs.length-1)*q,a=Math.floor(i);return xs[a]+(xs[Math.ceil(i)]-xs[a])*(i-a);}
 function robust(xs){return median(xs.filter(ok).sort((a,b)=>b-a).slice(0,3));}
 function pct(v,b){return ok(v)&&ok(b)&&b!==0?100*(v/b-1):null;}
 function signed(x,suffix='%'){return ok(x)?(x>0?'+':'')+Math.round(x)+suffix:'—';}
@@ -100,58 +101,75 @@ function renderProgress(){
  $('#latest-button').onclick=()=>openRide(latest.id);
 }
 
-function curveValue(a,d,mode=S.mode){const c=a?.curves.find(x=>x.seconds===d);return c?(mode==='late'?c.after_work['500']:mode==='loaded'?c.fatigue_levels.moderate:c[mode]):null;}
-function renderProfile(a,base){
- const container=$('#profile-chart'),ds=[30,60,...EFFORT_DURATIONS,7200];
- const rows=ds.map(d=>{const value=curveValue(a,d),v=base.map(r=>curveValue(S.models.get(r.id),d)).filter(ok);return {d,value,...compare(value,v),values:v};});
+function curveValue(a,d,mode=S.mode,band){
+ const c=a?.curves.find(x=>x.seconds===d);if(!c)return null;
+ return mode==='late'?c.after_hours[String(S.afterHour)]??null:mode==='loaded'?c.fatigue_levels[band]??null:c[mode];
+}
+function profileRows(a,base,ds,band){
+ return ds.map(d=>{const value=curveValue(a,d,S.mode,band),v=base.map(r=>curveValue(S.models.get(r.id),d,S.mode,band)).filter(ok);return {d,band,value,...compare(value,v)};});
+}
+function drawProfile(container,rows,limit){
  const valid=rows.filter(r=>ok(r.delta));
- if(!valid.length)return empty(container,'No comparable efforts at this duration yet.');
- const {svg,w,h}=chartFrame(container,Math.max(420,ds.length*35+47)),m={left:50,right:w<430?79:120,top:22,bottom:25};
- container.style.height=h+'px';
- const range=Math.max(15,...valid.map(r=>Math.abs(r.delta))),limit=Math.ceil(range/10)*10;
+ if(!valid.length)return empty(container,'No complete efforts with a comparison baseline here yet.');
+ const height=Math.max(420,rows.length*35+47);container.style.height=height+'px';
+ const {svg,w,h}=chartFrame(container,height),m={left:45,right:w<430?77:120,top:22,bottom:25};
  const X=v=>m.left+(v+limit)/(2*limit)*(w-m.left-m.right),rowH=(h-m.top-m.bottom)/rows.length;
- [-limit,0,limit].forEach(v=>{svg.appendChild(svgNode('line',{x1:X(v),x2:X(v),y1:m.top-7,y2:h-m.bottom,stroke:v===0?'#96a8c6':'#edf0f5','stroke-dasharray':v===0?'4 4':'0'}));svg.appendChild(svgNode('text',{x:X(v),y:13,'text-anchor':'middle'},v===0?'Your baseline':signed(v)));});
+ [-limit,0,limit].forEach(v=>{svg.appendChild(svgNode('line',{x1:X(v),x2:X(v),y1:m.top-7,y2:h-m.bottom,stroke:v===0?'#96a8c6':'#edf0f5','stroke-dasharray':v===0?'4 4':'0'}));svg.appendChild(svgNode('text',{x:X(v),y:13,'text-anchor':'middle'},v===0?'Prior median':signed(v)));});
  rows.forEach((r,i)=>{
   const y=m.top+i*rowH+rowH/2;
   if(r.d===S.effort)svg.appendChild(svgNode('rect',{x:-6,y:y-rowH/2+2,width:w+6,height:rowH-4,rx:5,fill:'#2859cf',opacity:.07,'data-selected-effort':r.d}));
   svg.appendChild(svgNode('text',{x:0,y:y+4,style:'font-size:12px;fill:#35445c'},dur(r.d)));
-  if(!ok(r.delta)){svg.appendChild(svgNode('text',{x:w-m.right+9,y:y+4,'text-anchor':'start'},'Not tested'));return;}
+  if(!ok(r.delta)){svg.appendChild(svgNode('text',{x:w-m.right+9,y:y+4,'text-anchor':'start'},!ok(r.value)?'No effort':'No baseline'));return;}
   const color=r.delta>=0?'#2859cf':'#c17a56';
   svg.appendChild(svgNode('rect',{x:Math.min(X(0),X(r.delta)),y:y-7,width:Math.max(2,Math.abs(X(r.delta)-X(0))),height:14,rx:3,fill:color}));
   const label=svgNode('text',{x:w-m.right+12,y:y+4,style:'font-size:13px;fill:'+color+';font-weight:600'},signed(r.delta));
-  label.appendChild(svgNode('title',{},Math.round(r.value)+' W vs '+Math.round(r.baseline)+' W median · '+r.n+' prior rides'));svg.appendChild(label);
+  label.appendChild(svgNode('title',{},Math.round(r.value)+' W vs '+Math.round(r.baseline)+' W median · '+r.n+' prior rides'+(r.band?' · '+r.band+' starting load':'')));svg.appendChild(label);
   if(w>=430)svg.appendChild(svgNode('text',{x:w-4,y:y+4,'text-anchor':'end'},'n='+r.n));
  });
- $('#profile-helper').textContent=S.mode==='p90'?'Exposure is the power cutoff for the strongest 10% of rolling averages. For the 5-minute row, average every possible five-minute segment and find that cutoff. The bar compares it with the median cutoff of your prior rides. Segments overlap: one long effort can contribute many averages, so this does not count repetitions or hard minutes. Adding easy time can lower the cutoff.':S.mode==='best'?'Best observed power, compared with the median of prior rides at each duration. Lower values can reflect an easier ride or fewer opportunities to ride hard.':S.mode==='repeated'?'Mean of the strongest three non-overlapping blocks at each duration. These are distinct blocks, not necessarily intentional repetitions. A duration needs three available blocks.':S.mode==='loaded'?'Best observed power while pre-effort modeled burden was 1–2. This combines nonlinear slow workload and recent hard-effort load, with separate recovery during stops. It is an experimental comparison band, not measured physiological fatigue.':'Best power after at least 500 kJ of recorded work. Stops permit recovery and remain part of the elapsed recording.';
- $('#detail-table').innerHTML='<div class="table-wrap"><table><thead><tr><th>Duration</th><th>This ride</th><th>Prior median</th><th>Difference</th><th>Prior rides</th></tr></thead><tbody>'+rows.map(r=>'<tr'+(r.d===S.effort?' class="selected-effort"':'')+'><td>'+dur(r.d)+'</td><td>'+(ok(r.value)?Math.round(r.value)+' W':'—')+'</td><td>'+(ok(r.baseline)?Math.round(r.baseline)+' W':'—')+'</td><td>'+signed(r.delta)+'</td><td>'+r.n+'</td></tr>').join('')+'</tbody></table></div>';
+}
+function renderProfile(a,base){
+ const container=$('#profile-chart'),ds=[30,60,...EFFORT_DURATIONS,7200],loaded=S.mode==='loaded';
+ const bands=[['low','Low load','Starting burden below 1'],['moderate','Moderate load','Starting burden 1 to below 2'],['high','High load','Starting burden 2 or higher']];
+ const groups=loaded?bands.map(([band,title,description])=>({band,title,description,rows:profileRows(a,base,ds,band)})):[{rows:profileRows(a,base,ds)}];
+ const rows=groups.flatMap(g=>g.rows),valid=rows.filter(r=>ok(r.delta));
+ const limit=Math.ceil(Math.max(15,...valid.map(r=>Math.abs(r.delta)))/10)*10;
+ container.classList.toggle('load-profile',loaded);container.innerHTML='';container.style.height=loaded?'auto':Math.max(420,ds.length*35+47)+'px';
+ if(loaded){
+  groups.forEach(g=>{const panel=document.createElement('div');panel.className='load-panel';panel.dataset.loadBand=g.band;panel.innerHTML='<h3>'+g.title+'</h3><p>'+g.description+'</p>';const chart=document.createElement('div');chart.className='load-panel-chart';panel.appendChild(chart);container.appendChild(panel);drawProfile(chart,g.rows,limit);});
+ }else drawProfile(container,rows,limit);
+ $('#profile-helper').textContent=loaded?'All three starting-load bands are shown. Each bar compares this ride’s best effort with prior rides in the same band, on a shared scale. Bands describe modeled burden at the effort’s start, not throughout the effort. Higher-load starts are included. Nonlinear intensity cost and recovery during stops affect burden; these bands are experimental, not measured physiological fatigue.':S.mode==='best'?'Best observed power, compared with the median of prior rides at each duration. Lower values can reflect an easier ride or fewer opportunities to ride hard.':S.mode==='repeated'?'Mean of the strongest three non-overlapping blocks at each duration. These are distinct blocks, not necessarily intentional repetitions. A duration needs three available blocks.':'Best complete effort starting at '+S.afterHour+':00 elapsed or later. For example, a 45-minute effort after 2h needs at least 2h45 of recording. Hour cutoffs include stops; stops also permit modeled recovery. This is a cumulative cutoff, not just the following hour.';
+ $('#detail-table').innerHTML='<div class="table-wrap"><table><thead><tr><th>Duration</th>'+(loaded?'<th>Starting load</th>':'')+'<th>This ride</th><th>Prior median</th><th>Difference</th><th>Prior rides</th></tr></thead><tbody>'+rows.map(r=>'<tr'+(r.d===S.effort?' class="selected-effort"':'')+'><td>'+dur(r.d)+'</td>'+(loaded?'<td>'+r.band+'</td>':'')+'<td>'+(ok(r.value)?Math.round(r.value)+' W':'—')+'</td><td>'+(ok(r.baseline)?Math.round(r.baseline)+' W':'—')+'</td><td>'+signed(r.delta)+'</td><td>'+r.n+'</td></tr>').join('')+'</tbody></table></div>';
 }
 function renderDurability(a,base){
- const d=S.effort,c=a.curves.find(x=>x.seconds===d),levels=[0,250,500,750,1000,1250,1500];
- $('#durability-description').textContent='Your best '+d/60+'-min power after increasing amounts of work.';
- if(!c)return empty($('#durability-chart'),'This ride has no effort that long.');
+ const d=S.effort,c=a.curves.find(x=>x.seconds===d);
+ $('#durability-description').textContent='Your best complete '+d/60+'-min effort starting after each elapsed-hour cutoff.';
+ if(!c)return empty($('#durability-chart'),'This ride has no complete effort that long.');
  if(S.loadView==='fatigue'){
+  $('#durability-description').textContent='Your best '+d/60+'-min power across all three starting-load bands.';
   const labels=['low','moderate','high'],names=['Low','Moderate','High'];
   const val=(r,k)=>{const c=r.curves.find(x=>x.seconds===d);return c&&ok(c.fatigue_levels[k])&&c.best>0?100*c.fatigue_levels[k]/c.best:null;};
-  lineChart($('#durability-chart'),[{label:'Comparison rides',color:'#a8b5cb',dash:true,data:labels.map((k,i)=>({x:i,y:median(base.map(r=>val(S.models.get(r.id),k)))}))},{label:'This ride',color:'#2859cf',width:3,data:labels.map((k,i)=>({x:i,y:val(a,k),tip:names[i]+' modeled load · '+(ok(val(a,k))?Math.round(val(a,k))+'% of ride best':'Not observed')}))}],{xmin:0,xmax:2,xticks:[0,1,2],xformat:x=>names[Math.round(x)]||'',yformat:y=>Math.round(y)+'%',ymin:0,ymax:110,reference:100});
-  $('#durability-helper').textContent='Experimental pre-effort workload bands: low <1, moderate 1–2, high ≥2. The index combines slow accumulated load and recent hard work; stops reduce it. Power is indexed to the ride’s best at this duration.';
+  lineChart($('#durability-chart'),[{label:'Comparison rides',color:'#a8b5cb',dash:true,data:labels.map((k,i)=>({x:i,y:median(base.map(r=>val(S.models.get(r.id),k)))}))},{label:'This ride',color:'#2859cf',width:3,data:labels.map((k,i)=>({x:i,y:val(a,k),tip:names[i]+' starting load · '+(ok(val(a,k))?Math.round(val(a,k))+'% of ride best':'Not observed')}))}],{xmin:0,xmax:2,xticks:[0,1,2],xformat:x=>names[Math.round(x)]||'',yformat:y=>Math.round(y)+'%',ymin:0,ymax:110,reference:100});
+  $('#durability-helper').textContent='Experimental pre-effort workload bands: low <1, moderate 1–2, high ≥2. The index combines accumulated and recent hard work; stops reduce it. All bands are included. Power is indexed to the ride’s best at this duration.';
   return;
  }
- $('#durability-helper').textContent='Indexed to each ride’s best effort at that duration. Later climbs and pacing affect the opportunity to produce power; a lower point is not proof of fatigue.';
- function retain(a,k){const c=a.curves.find(x=>x.seconds===d);return c&&ok(c.after_work[String(k)])&&c.best>0?100*c.after_work[String(k)]/c.best:null;}
+ const levels=Array.from(new Set([...(a.elapsed_hours||[]),...base.flatMap(r=>S.models.get(r.id).elapsed_hours||[])])).sort((a,b)=>a-b);
+ const max=Math.max(1,...levels),step=Math.max(1,Math.ceil(max/4)),ticks=levels.filter(k=>k%step===0||k===max);
+ function retain(a,k){const c=a.curves.find(x=>x.seconds===d);return c&&ok(c.after_hours[String(k)])&&c.best>0?100*c.after_hours[String(k)]/c.best:null;}
  lineChart($('#durability-chart'),[
-  {label:'Comparison rides',color:'#a8b5cb',dash:true,data:levels.map(k=>({x:k,y:median(base.map(r=>retain(S.models.get(r.id),k))),tip:k+' kJ · prior median'}))},
-  {label:'This ride',color:'#2859cf',width:3,data:levels.map(k=>({x:k,y:retain(a,k),tip:'After '+k+' kJ · '+(ok(retain(a,k))?Math.round(retain(a,k))+'% of this ride’s best':'No effort recorded')}))}
- ],{yformat:y=>Math.round(y)+'%',xformat:x=>Math.round(x)+' kJ',reference:100,ymin:0,ymax:110,xmin:0});
+  {label:'Comparison rides',color:'#a8b5cb',dash:true,data:levels.map(k=>{const values=base.map(r=>retain(S.models.get(r.id),k)).filter(ok);return {x:k,y:median(values),tip:'After '+k+'h · prior median · '+values.length+' rides'};})},
+  {label:'This ride',color:'#2859cf',width:3,data:levels.map(k=>({x:k,y:retain(a,k),tip:(k?'After '+k+'h':'Overall best')+' · '+(ok(retain(a,k))?Math.round(retain(a,k))+'% of this ride’s best':'No complete effort recorded')}))}
+ ],{yformat:y=>Math.round(y)+'%',xformat:x=>x===0?'Overall':'After '+x+'h',xticks:ticks,reference:100,ymin:0,ymax:110,xmin:0,xmax:max});
+ $('#durability-helper').textContent='Each point uses the best full '+d/60+'-minute effort beginning at that elapsed hour or later, divided by that ride’s overall best at the same duration. A missing point means no complete effort fits. Stops stay on the elapsed clock and permit recovery. Hour markers match time into a ride, not physiological fatigue.';
 }
-function interpolateExposure(a,watts){const e=a.exposure;for(let i=1;i<e.length;i++)if(e[i].watts>=watts){const lo=e[i-1],hi=e[i];return lo.minutes_per_hour+(hi.minutes_per_hour-lo.minutes_per_hour)*(watts-lo.watts)/(hi.watts-lo.watts);}return e.at(-1)?.minutes_per_hour??null;}
-function renderExposure(a,base){
- if(S.exposureView==='all'){
+function interpolatePowerTime(a,watts){const e=a.power_time;for(let i=1;i<e.length;i++)if(e[i].watts>=watts){const lo=e[i-1],hi=e[i];return lo.minutes_per_hour+(hi.minutes_per_hour-lo.minutes_per_hour)*(watts-lo.watts)/(hi.watts-lo.watts);}return e.at(-1)?.minutes_per_hour??null;}
+function renderPowerTime(a,base){
+ if(S.powerView==='all'){
   const levels=[100,120,140,160,180,200,220,250,300];
-  lineChart($('#exposure-chart'),[{label:'Comparison rides',color:'#a8b5cb',dash:true,data:levels.map(w=>({x:w,y:median(base.map(r=>interpolateExposure(S.models.get(r.id),w)))}))},{label:'This ride',color:'#2859cf',width:3,data:levels.map(w=>({x:w,y:interpolateExposure(a,w),tip:w+' W or more · '+interpolateExposure(a,w).toFixed(1)+' min per moving hour'}))}],{ymin:0,xmin:100,xmax:300,xformat:x=>Math.round(x)+' W',yformat:y=>Math.round(y)+'m/h'});
+  lineChart($('#power-time-chart'),[{label:'Comparison rides',color:'#a8b5cb',dash:true,data:levels.map(w=>({x:w,y:median(base.map(r=>interpolatePowerTime(S.models.get(r.id),w)))}))},{label:'This ride',color:'#2859cf',width:3,data:levels.map(w=>({x:w,y:interpolatePowerTime(a,w),tip:w+' W or more · '+interpolatePowerTime(a,w).toFixed(1)+' min per moving hour'}))}],{ymin:0,xmin:100,xmax:300,xformat:x=>Math.round(x)+' W',yformat:y=>Math.round(y)+'m/h'});
   return;
  }
- const levels=[0,10,20,30,40,50],value=(a,p)=>interpolateExposure(a,a.reference_ftp*(1+p/100));
- lineChart($('#exposure-chart'),[
+ const levels=[0,10,20,30,40,50],value=(a,p)=>interpolatePowerTime(a,a.reference_ftp*(1+p/100));
+ lineChart($('#power-time-chart'),[
   {label:'Comparison rides',color:'#a8b5cb',dash:true,data:levels.map(p=>({x:p,y:median(base.map(r=>value(S.models.get(r.id),p)))}))},
   {label:'This ride',color:'#2859cf',width:3,data:levels.map(p=>({x:p,y:value(a,p),tip:(p?'Threshold +'+p+'%':'Threshold')+' · '+value(a,p).toFixed(1)+' min per moving hour'}))}
  ],{ymin:0,xmin:0,xmax:50,xformat:x=>x===0?'At FTP':'+'+Math.round(x)+'%',yformat:y=>Math.round(y)+'m/h'});
@@ -175,7 +193,7 @@ function renderRide(){
  $('#ride-observation').hidden=!ride.note?.observation;
  $('#ride-observation').textContent=ride.note?.observation||'';
  $('#ride-metrics').innerHTML=Object.keys(METRICS).map(k=>{const value=metricValue(a,k),c=compare(value,base.map(r=>metricValue(S.models.get(r.id),k)));const enough=c.n>=3,untested=easy&&ok(c.delta)&&c.delta<0;return metricCard(k,enough&&!untested?c.delta:null,METRICS[k].caption+' · '+(untested?'Endurance ride · capacity not tested':enough?'vs prior median · '+c.n+' comparison rides':c.n+' prior rides'),false,untested?'Not tested':!ok(value)?'Not observed':'More evidence');}).join('');
- renderProfile(a,base);renderDurability(a,base);renderExposure(a,base);renderTimeline(a);
+ renderProfile(a,base);renderDurability(a,base);renderPowerTime(a,base);renderTimeline(a);
 }
 function renderLibrary(){
  const search=$('#search').value.toLowerCase(),rides=eligible().slice().reverse().filter(r=>(r.start_local+' '+r.name).toLowerCase().includes(search));
@@ -185,6 +203,7 @@ function renderLibrary(){
 }
 function render(){
  if(!S.data)return;
+ syncAfterHour();
  $$('.page').forEach(p=>p.hidden=p.id!==S.page+'-page');$$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===S.page));
  const titles={progress:['THE BIG PICTURE','Am I getting better?'],ride:['YOUR PERFORMANCE, IN CONTEXT','Explore a ride'],library:['YOUR PERSONAL RECORD','Ride library']};
  $('#page-eyebrow').textContent=titles[S.page][0];$('#page-title').textContent=titles[S.page][1];$('#nav-count').textContent=eligible().length;
@@ -211,11 +230,12 @@ $$('.nav-item').forEach(b=>b.onclick=()=>{S.page=b.dataset.page;render();});
 $('#cutoff').onchange=()=>{S.cutoff=Number($('#cutoff').value);if(!eligible().some(r=>r.id===S.selected))S.selected=eligible().at(-1)?.id;render();};
 $('#period').onchange=()=>{S.period=$('#period').value==='all'?'all':Number($('#period').value);render();};
 $('#ride-select').onchange=()=>openRide($('#ride-select').value);
+$('#after-hour').onchange=()=>{S.afterHour=Number($('#after-hour').value);try{localStorage.setItem('long-view-after-hour',String(S.afterHour));}catch{}render();};
 $('#search').oninput=renderLibrary;
 $$('#curve-mode button').forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;$$('#curve-mode button').forEach(x=>x.classList.toggle('selected',x===b));renderRide();});
 $('#effort-duration').onchange=e=>setEffort(e.target.value);$('#late-duration').onchange=e=>setEffort(e.target.value);$('#timeline-mode').onchange=renderRide;
 $$('#load-view button').forEach(b=>b.onclick=()=>{S.loadView=b.dataset.view;$$('#load-view button').forEach(x=>x.classList.toggle('selected',x===b));renderRide();});
-$$('#exposure-view button').forEach(b=>b.onclick=()=>{S.exposureView=b.dataset.view;$$('#exposure-view button').forEach(x=>x.classList.toggle('selected',x===b));renderRide();});
+$$('#power-time-view button').forEach(b=>b.onclick=()=>{S.powerView=b.dataset.view;$$('#power-time-view button').forEach(x=>x.classList.toggle('selected',x===b));renderRide();});
 $('#data-button').onclick=settingsDialog;$('#sync-button').onclick=settingsDialog;
 $('#connect-form').onsubmit=async e=>{
  e.preventDefault();const status=$('#job-status');status.hidden=false;status.textContent='Checking the connection…';

@@ -1,5 +1,6 @@
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import numpy as np
 
@@ -47,7 +48,7 @@ class ModelTests(unittest.TestCase):
             for y in blocks[i+1:]:
                 self.assertTrue(x['start']+300 <= y['start'] or y['start']+300 <= x['start'])
 
-    def test_late_efforts_need_prior_work(self):
+    def test_late_efforts_need_an_hour_and_a_complete_effort(self):
         a = model.analyze(meta(), recording([140]*1200))
         self.assertIsNone(a['metrics']['late'])
         self.assertIsNotNone(a['metrics']['sustained'])
@@ -59,16 +60,47 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(model.EFFORT_DURATIONS, [180,300,480,600,900,1200,1800,2700,3600])
         for d in model.EFFORT_DURATIONS:
             self.assertAlmostEqual(curves[d]['best'], round(float(np.mean(power[-d:])), 2))
-            self.assertIn(str(d), a['work_curve'][0])
+            self.assertEqual(curves[d]['after_hours']['0'], curves[d]['best'])
+            self.assertNotIn('p90', curves[d])
         self.assertIsNone(curves[2700]['repeated'])
         self.assertEqual(curves[2700]['repeat_count'], 2)
 
-    def test_late_45_requires_work_before_window(self):
-        a = model.analyze(meta(), recording([300]*1800+[140]*2700))
+    def test_late_45_uses_elapsed_cutoff_and_requires_full_duration(self):
+        a = model.analyze(meta(), recording([300]*1800+[140]*7200))
         c = next(c for c in a['curves'] if c['seconds'] == 2700)
         self.assertGreater(c['best'], 140)
-        self.assertAlmostEqual(c['after_work']['500'], (133*300+2567*140)/2700, places=2)
-        self.assertIsNone(c['after_work']['750'])
+        self.assertEqual(c['after_hours']['1'], 140)
+        self.assertIsNone(c['after_hours']['2'])
+        self.assertEqual(a['metrics']['late'], 140)
+
+    def test_hourly_eligibility_does_not_depend_on_absolute_watts(self):
+        for scale in [1, 2]:
+            a = model.analyze(meta(), recording([100*scale]*3600+[150*scale]*300))
+            c = next(c for c in a['curves'] if c['seconds'] == 300)
+            self.assertEqual(c['after_hours']['1'], 150*scale)
+
+    def test_stops_advance_hour_cutoff_and_stay_zero_power(self):
+        a = model.analyze(meta(), {'rows': recording([140]*1800)['rows']+recording([150]*1800, 3600)['rows']})
+        c = next(c for c in a['curves'] if c['seconds'] == 300)
+        self.assertEqual(a['stop_seconds'], 1800)
+        self.assertEqual(c['after_hours']['1'], 150)
+        self.assertEqual(a['elapsed_hours'], [0, 1])
+
+    def test_hour_boundary_requires_every_second_of_selected_duration(self):
+        for count, expected in [(179, None), (180, 150)]:
+            a = model.analyze(meta(), recording([100]*3600+[150]*count))
+            c = next(c for c in a['curves'] if c['seconds'] == 180)
+            self.assertEqual(c['after_hours']['1'], expected)
+
+    def test_high_starting_load_is_retained_alongside_other_bands(self):
+        power = [140]*300+[150]*300+[160]*300
+        slow = np.r_[np.zeros(300), np.full(300, 45), np.full(301, 90)]
+        with patch.object(model, 'fatigue', return_value=(slow, np.zeros(901))):
+            a = model.analyze(meta(), recording(power))
+        c = next(c for c in a['curves'] if c['seconds'] == 180)
+        self.assertEqual(set(c['fatigue_levels']), {'low', 'moderate', 'high'})
+        self.assertEqual(c['fatigue_levels']['high'], 160)
+        self.assertTrue(all(value is not None for value in c['fatigue_levels'].values()))
 
     def test_missing_samples_not_fabricated(self):
         r = recording([140]*1200)

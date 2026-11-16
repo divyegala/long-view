@@ -49,7 +49,7 @@ These three rows illustrate shape, not a complete two-hour recording. Generate c
 | source | Provider slug, 1–32 letters, digits, underscore or hyphen. |
 | activity.id | Source-native ID string. Importer derives a stable provider-namespaced local ID; reimport updates it. |
 | start_local | ISO local wall datetime without offset. Convert UTC using the athlete's timezone, never an assumed execution-host timezone. |
-| duration_minutes | Measured moving minutes, positive. Needed for eligibility and moving-hour exposure. Do not replace unknown duration with zero. |
+| duration_minutes | Measured moving minutes, positive. Needed for eligibility and minutes of work per moving hour. Do not replace unknown duration with zero. |
 | type | Ride, VirtualRide, MountainBikeRide, GravelRide, TrackRide or Cyclocross. VirtualRide or trainer=true selects the indoor reference. |
 | Other metadata | Optional supplied metrics/provenance are preserved: avg_hr, avg_watts, np_watts, distance_m, recorded_ftp, device, etc. Preserve source meanings. |
 | recording | Object, null or omitted for catalog-only data. Metadata-only resync preserves an existing recording. |

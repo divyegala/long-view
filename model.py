@@ -2,10 +2,9 @@
 import math
 import numpy as np
 
-VERSION = "long-view-1.0.2"
+VERSION = "long-view-1.1.0"
 EFFORT_DURATIONS = [180,300,480,600,900,1200,1800,2700,3600]
 DURATIONS = sorted(set([30,60,120,2400,5400,7200,10800] + EFFORT_DURATIONS))
-WORK_LEVELS = [0,250,500,750,1000,1250,1500]
 DEFAULTS = {"indoor_ftp":185,"outdoor_ftp":203,"aerobic_reference_w":140,"exponent":3,"slow_tau_minutes":240,"fast_tau_seconds":120}
 
 def finite(value):
@@ -57,10 +56,10 @@ def analyze(meta, recording, options=None):
     gaps=[{"start":int(a),"end":int(b),"seconds":int(b-a)} for a,b in zip(np.flatnonzero(transition==1),np.flatnonzero(transition==-1))]
     slow,fast=fatigue(power,reference,settings)
     burden=slow/30+fast/5
-    weights=1+burden/(1+burden)
     sums=np.r_[0,np.cumsum(np.nan_to_num(power,nan=0))]
     missing=np.r_[0,np.cumsum(~np.isfinite(power))]
     work=sums/1000
+    hours=list(range(n//3600+1))
     curves=[];chosen={}
     for d in DURATIONS:
         if d>n:continue
@@ -70,31 +69,23 @@ def analyze(meta, recording, options=None):
         top=best_blocks(starts,values,d)
         best=top[0];j=int(np.argmax(values));t=int(starts[j])
         after={}
-        for k in WORK_LEVELS:
-            mask=work[starts]>=k
-            after[str(k)]=round(float(values[mask].max()),2) if np.any(mask) else None
+        for hour in hours:
+            mask=starts>=hour*3600
+            after[str(hour)]=round(float(values[mask].max()),2) if np.any(mask) else None
         fatigue_levels={}
         for lo,hi,label in [(0,1,"low"),(1,2,"moderate"),(2,float("inf"),"high")]:
             mask=(burden[starts]>=lo)&(burden[starts]<hi)
             fatigue_levels[label]=round(float(values[mask].max()),2) if np.any(mask) else None
         chosen[str(d)]=[{**b,"prior_work_kj":round(float(work[b["start"]]),1),
-            "slow":round(float(slow[b["start"]]),2),"fast":round(float(fast[b["start"]]),2),
-            "fatigue_weight":round(float(weights[b["start"]]),3)} for b in top]
+            "slow":round(float(slow[b["start"]]),2),"fast":round(float(fast[b["start"]]),2)} for b in top]
         curves.append({"seconds":d,"best":best["watts"],
             "repeated":round(float(np.mean([b["watts"] for b in top])),2) if len(top)==3 else None,
-            "repeat_count":len(top),"after_work":after,"fatigue_levels":fatigue_levels,
-            "p50":round(float(np.quantile(values,.5)),2),"p90":round(float(np.quantile(values,.9)),2),
+            "repeat_count":len(top),"after_hours":after,"fatigue_levels":fatigue_levels,
             "prior_work_kj":round(float(work[t]),1),"start":t})
     lookup={x["seconds"]:x for x in curves}
     active_hours=max(float(meta.get("duration_minutes") or np.sum(power>0)/60)/60,1/60)
     hard_seconds=int(np.sum(power>reference))
-    exposure=[{"watts":p,"minutes_per_hour":round(float(np.sum(power>=p))/60/active_hours,2)} for p in range(80,351,10)]
-    by_work=[]
-    for k in WORK_LEVELS:
-        row={"kj":k}
-        for d in DURATIONS:
-            row[str(d)]=lookup.get(d,{}).get("after_work",{}).get(str(k))
-        by_work.append(row)
+    power_time=[{"watts":p,"minutes_per_hour":round(float(np.sum(power>=p))/60/active_hours,2)} for p in range(80,351,10)]
     detail=[]
     for a in range(0,n,30):
         b=min(a+30,n);p=power[a:b];h=hr[a:b]
@@ -102,12 +93,12 @@ def analyze(meta, recording, options=None):
             "hr":round(float(np.nanmean(h)),1) if np.isfinite(h).any() else None,
             "work":round(float(work[a]),1),"slow":round(float(slow[a]),2),"fast":round(float(fast[a]),2)})
     return {"version":VERSION,"id":meta["id"],"reference_ftp":reference,"indoor":indoor,"settings":settings,
-        "curves":curves,"blocks":chosen,"work_curve":by_work,"exposure":exposure,"timeline":detail,"stops":gaps,
+        "curves":curves,"blocks":chosen,"elapsed_hours":hours,"power_time":power_time,"timeline":detail,"stops":gaps,
         "recorded_seconds":int(observed.sum()),"stop_seconds":int(stops.sum()),"elapsed_seconds":n,
         "missing_power_samples":int(np.sum(~np.isfinite(power))),"recorded_work_kj":round(float(work[-1]),2),
         "metrics":{"short":lookup.get(180,{}).get("repeated"),"sustained":lookup.get(1200,{}).get("best"),
             "repeatability":round(hard_seconds/60/active_hours,2),
-            "late":lookup.get(1200,{}).get("after_work",{}).get("500")},
+            "late":lookup.get(1200,{}).get("after_hours",{}).get("1")},
         "model_note":"Descriptive experimental indices; not a physiological fatigue measurement. Watts are unchanged between environments."}
 
 def distribution(values):

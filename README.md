@@ -37,39 +37,39 @@ LONG_VIEW_DATA_DIR=data/demo .venv/bin/python server.py --port 8766 --open
 
 ## Reading the charts
 
-Choose **3, 5, 8, 10, 15, 20, 30, 45 or 60 minutes**. Selection updates power and late-power cards, their trends, and Power after work. The duration comparison shows all nine.
+Choose **3, 5, 8, 10, 15, 20, 30, 45 or 60 minutes**. Selection updates power and late-power cards, their trends, and Power later in the ride. The duration comparison shows all nine. **Late starts** selects after 1h, 2h, 3h, etc. and updates the late-power cards and trends together.
 
-| View | Meaning |
-| --- | --- |
-| **Exposure** | The power cutoff for the strongest 10% of rolling averages at that duration. See the example below. |
-| **Best** | Highest observed rolling average power at that duration. |
-| **Repeated** | Mean of the strongest three greedily selected, non-overlapping blocks. All three must exist; they can be pieces of one longer effort. |
-| **Late** | Best window **starting after 500 kJ of recorded mechanical work**. It can include a hard block; it does not necessarily mean the final hour. |
-| **Under load** | Best window starting in the experimental **moderate burden band, 1 ≤ B < 2**. Higher-burden starts are excluded from this particular view. |
-| **Power after work** | Best power after increasing kJ thresholds, divided by that ride's best at the chosen duration. The alternative shows retention in low, moderate and high modeled-load bands. |
-| **Work across power levels** | Cumulative minutes at or above each wattage per moving hour. Above-FTP view uses each environment's reference. |
+All examples below are hypothetical. Percentages in the duration bars compare with the median of earlier rides under the same conditions.
 
-The separate **Repeated 3-min power** marker stays fixed at three minutes. **Repeatability** counts all minutes above FTP per moving hour; it does not count intentional intervals.
-
-### Exposure: a worked example
-
-For the **5-minute** row, imagine moving a five-minute frame through the ride, one second at a time: 0:00–5:00, 0:01–5:01, 0:02–5:02, and so on. Calculate average power inside each frame, then sort all those averages from lowest to highest.
-
-- **Best** picks the single highest average.
-- **Exposure** picks the cutoff where the strongest 10% of those averages begin. Statistically, this is the 90th percentile.
-
-For two hypothetical rides of the same length:
-
-| | Ride A | Ride B |
+| View | Meaning | Example |
 | --- | --- | --- |
-| Best 5-minute power | 200 W | 200 W |
-| 5-minute Exposure | 140 W | 170 W |
+| **Best** | Highest complete rolling average power at each duration. | Your strongest 20-minute average is 200 W; the prior-ride median is 180 W. The bar shows **+11%**. |
+| **Repeated** | Mean of the strongest three greedily selected, non-overlapping blocks. All three must exist; they can be pieces of one longer effort. | Three 10-minute blocks at 210, 200 and 190 W give **200 W**. With only two available blocks, Repeated is unavailable. |
+| **Late** | Best complete effort starting at the selected elapsed hour or later. Default: after 1h. | For 20 minutes after 2h, a 185 W block from 2:10–2:30 qualifies. A 210 W block at 0:40 does not. A 45-minute effort after 2h needs at least 2h45 of recording. |
+| **Under load** | Three panels show best efforts beginning at low, moderate and high modeled burden. Each compares against prior efforts beginning in the same band. | High-load 20-minute power of 190 W versus a prior high-load median of 180 W shows **+6%** in the high panel. It is not compared with fresh efforts, and high-load starts are never discarded. |
+| **Power later in the ride — By elapsed hour** | Best full effort after each hour cutoff, divided by that ride's overall best at the same duration. | Best 20-minute power is 200 W overall, 190 W after 1h and 180 W after 2h: points are **100%, 95%, 90%**. |
+| **Power later in the ride — By modeled load** | Power retained in each starting-load band, divided by that ride's overall best at the chosen duration. | Best 20-minute power is 200 W; best high-load power is 180 W. The high-load point is **90%**. |
+| **Work across power levels** | Cumulative minutes at or above each wattage per moving hour. Above-FTP view uses each environment's reference. | Twelve minutes at or above 200 W in two moving hours gives **6 min/h** at 200 W. |
 
-Both reached the same peak. Ride B's strongest tenth of five-minute averages starts at a higher power. This helps show high-power work beyond one standout peak.
+The **Repeated 3-min power** marker stays fixed at three minutes: blocks at 240, 230 and 220 W give 230 W. **Repeatability** counts all above-FTP minutes per moving hour: twenty hard minutes in two moving hours gives 10 min/h. It does not count intentional intervals.
 
-If the chart says **+10%** on the 5-minute Exposure row, this ride's cutoff was 10% higher than the median cutoff of the comparison rides. It does **not** mean 10% more hard minutes.
+### What “after an hour” means
 
-The frames overlap: one long hard effort contributes many strong averages. Exposure therefore cannot count repetitions or tell you how many separate hard minutes you rode. Extending a ride with easy time can also lower Exposure even when the hard work is identical. Use **Repeated** for three separate blocks and **Work across power levels** for accumulated time above a wattage.
+These are cumulative start cutoffs: **after 1h** searches from 1:00 onward, **after 2h** from 2:00 onward, and so on. They are not separate 1:00–2:00 buckets. Every second of the selected effort must fit in the recording; unavailable efforts remain missing rather than zero. On a 2h15 ride, after-2h power can exist for a 10-minute effort but not for a 20-minute effort.
+
+The clock is **elapsed time**, including stops. A 30-minute stop advances the hour marker and permits modeled recovery. Hour markers match time into a ride, not equal fatigue. Use Under load alongside them to inspect the effect of preceding intensity and recovery.
+
+### What “under load” means
+
+The model evaluates burden **at the effort's start**: low below 1, moderate from 1 to below 2, high at least 2. Every band is shown on the same percentage scale. Missing bands remain missing. A 45-minute effort can start at low load and accumulate substantial load during the effort; its classification still describes its start.
+
+For example, two efforts may begin two hours into their rides. One follows hard threshold work; the other follows easy riding and a long stop. Their hour cutoff is the same, while the model may assign different starting-load bands. These bands are experimental context, not measurements of physiological fatigue.
+
+### Trend and timeline examples
+
+On a progress trend, **110 against reference 100** means the recorded measure is 10% higher than the reference. The smooth line follows the recent strongest-three median; it does not make a single ride a fitness test.
+
+On the ride timeline, a 30-minute recording stop appears as shaded zero-power time. The slow and fast workload states recover during that interval, and the elapsed clock keeps advancing.
 
 ## Comparisons
 

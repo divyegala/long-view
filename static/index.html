@@ -21,6 +21,7 @@
   <label>Long ride <select id="cutoff"><option value="120">120+ minutes</option><option value="90">90+ minutes</option></select></label>
   <label>Comparison <select id="period"><option value="42">42 days</option><option value="90" selected>90 days</option><option value="all">All previous rides</option></select></label>
   <label>Effort <select id="effort-duration" aria-label="Effort duration"></select></label>
+  <label>Late starts <select id="after-hour" aria-label="Late effort starting hour"></select></label>
   <span class="combined"><span class="tiny-circle"></span> Indoor + outdoor together</span>
   <span class="coverage" id="coverage">Loading local history…</span>
  </div>
@@ -35,7 +36,7 @@
   <div class="bottom-grid">
    <section class="panel"><div class="panel-heading"><div><h2>What counts as progress?</h2><p>The same rider, different ways to improve.</p></div></div>
     <div class="definition"><b>01</b><div><strong>More power across durations</strong><p>Compare short, sustained and repeated efforts with your own history.</p></div></div>
-    <div class="definition"><b>02</b><div><strong>More useful work late</strong><p>Look at what you produced after the same accumulated workload.</p></div></div>
+    <div class="definition"><b>02</b><div><strong>More useful work late</strong><p>Compare what you produced after the same elapsed hour, with preceding load and stops in context.</p></div></div>
     <div class="definition"><b>03</b><div><strong>Greater repeatability</strong><p>More hard minutes and stronger repeated blocks, beyond a single peak.</p></div></div>
    </section>
    <section class="panel"><div class="panel-heading"><div><h2>Your latest long ride</h2><p id="latest-context"></p></div></div><div id="latest-summary"></div><button class="button primary" id="latest-button">Explore this ride <span>→</span></button></section>
@@ -52,22 +53,22 @@
    <div class="metrics" id="ride-metrics"></div>
    <section class="panel">
     <div class="panel-heading"><div><h2>Where did this ride stand out?</h2><p>Power at each duration, relative to your preceding comparison rides.</p></div>
-     <div class="segmented" id="curve-mode"><button data-mode="p90" class="selected">Exposure</button><button data-mode="best">Best</button><button data-mode="repeated">Repeated</button><button data-mode="late">Late</button><button data-mode="loaded">Under load</button></div></div>
+     <div class="segmented" id="curve-mode"><button data-mode="best" class="selected">Best</button><button data-mode="repeated">Repeated</button><button data-mode="late">Late</button><button data-mode="loaded">Under load</button></div></div>
     <div id="profile-chart" class="chart profile" role="img" aria-label="Power differences across effort durations"></div>
     <p class="helper" id="profile-helper"></p>
    </section>
    <div class="bottom-grid equal">
     <section class="panel">
-     <div class="panel-heading"><div><h2>Power after work</h2><p id="durability-description"></p></div><label class="compact-label">Effort<select id="late-duration" aria-label="Power after work effort duration"></select></label></div>
-     <div class="segmented inline-control" id="load-view"><button data-view="work" class="selected">After work</button><button data-view="fatigue">After modeled load</button></div>
-     <div id="durability-chart" class="chart" role="img" aria-label="Power retained after accumulated work"></div>
+     <div class="panel-heading"><div><h2>Power later in the ride</h2><p id="durability-description"></p></div><label class="compact-label">Effort<select id="late-duration" aria-label="Later power effort duration"></select></label></div>
+     <div class="segmented inline-control" id="load-view"><button data-view="time" class="selected">By elapsed hour</button><button data-view="fatigue">By modeled load</button></div>
+     <div id="durability-chart" class="chart" role="img" aria-label="Power retained after elapsed hours or modeled load"></div>
      <div class="chart-footer"><span class="legend-key blue"></span> This ride <span class="legend-key grey"></span> Your comparison rides</div>
      <p class="helper" id="durability-helper">Indexed to each ride’s best effort at that duration. Later climbs and pacing affect the opportunity to produce power; a lower point is not proof of fatigue.</p>
     </section>
     <section class="panel">
      <div class="panel-heading"><div><h2>Work across power levels</h2><p>Time accumulated at each power, compared with your history.</p></div></div>
-     <div class="segmented inline-control" id="exposure-view"><button data-view="all" class="selected">All power</button><button data-view="hard">Above FTP</button></div>
-     <div id="exposure-chart" class="chart" role="img" aria-label="Hard-effort exposure compared with prior rides"></div>
+     <div class="segmented inline-control" id="power-time-view"><button data-view="all" class="selected">All power</button><button data-view="hard">Above FTP</button></div>
+     <div id="power-time-chart" class="chart" role="img" aria-label="Accumulated time above power levels compared with prior rides"></div>
      <div class="chart-footer"><span class="legend-key blue"></span> This ride <span class="legend-key grey"></span> Your comparison rides</div>
      <p class="helper">Minutes per moving hour. Indoor and outdoor threshold references differ; aerobic watts are not converted between environments.</p>
     </section>
