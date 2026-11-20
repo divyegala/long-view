@@ -23,6 +23,10 @@ def write(path,data):
 def settings():return {**model.DEFAULTS,**read(DATA/"settings.json",{})}
 def local_timezone():return ZoneInfo(os.environ.get("LONG_VIEW_TIMEZONE") or read(DATA/"preferences.json",{}).get("timezone","UTC"))
 def catalog():return read(DATA/"catalog.json",[])
+def save_note(data):
+    i=safe_id(data["id"]);notes=read(DATA/"notes.json",{})
+    notes[i]={**notes.get(i,{}),"rpe":data.get("rpe"),"intent":data.get("intent","unspecified")}
+    write(DATA/"notes.json",notes)
 def recording_path(i):return DATA/"streams"/(i+".json")
 def safe_id(i):
     if not re.fullmatch(r"[a-zA-Z0-9_-]{1,100}",i):raise ValueError("Invalid ride identifier.")
@@ -209,8 +213,7 @@ class Handler(BaseHTTPRequestHandler):
                         updated[k]=value
                 write(DATA/"settings.json",updated);return self.reply({"saved":True})
             if path=="/api/note":
-                i=safe_id(data["id"]);notes=read(DATA/"notes.json",{});notes[i]={"rpe":data.get("rpe"),"intent":data.get("intent","unspecified")}
-                write(DATA/"notes.json",notes);return self.reply({"saved":True})
+                save_note(data);return self.reply({"saved":True})
             self.reply({"error":"Not found."},404)
         except (ValueError,KeyError,zipfile.BadZipFile,ImportError) as e:self.reply({"error":str(e)},400)
         except Exception:self.reply({"error":"The operation could not finish. No external training records were changed."},500)

@@ -63,6 +63,15 @@ class ImportTests(unittest.TestCase):
         self.assertIsNone(server.load_analysis(server.catalog()[0]))
         self.assertEqual(server.bootstrap()['coverage']['modeled120'], 0)
 
+    def test_effort_note_edit_preserves_recorded_lap_comparison(self):
+        comparison = [{'step': 1, 'block_1_hr': 130, 'block_2_hr': 134}]
+        server.write(server.DATA/'notes.json', {'example': {'lap_hr_comparison': comparison, 'observation': 'Synthetic note'}})
+        server.save_note({'id': 'example', 'rpe': 4, 'intent': 'endurance'})
+        saved = server.read(server.DATA/'notes.json', {})['example']
+        self.assertEqual(saved['rpe'], 4)
+        self.assertEqual(saved['lap_hr_comparison'], comparison)
+        self.assertEqual(saved['observation'], 'Synthetic note')
+
     def test_ambiguous_timeline_is_rejected_before_any_writes(self):
         incoming = bundle()
         bad = copy.deepcopy(incoming['activities'][0])

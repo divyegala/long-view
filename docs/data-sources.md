@@ -83,3 +83,5 @@ FIT upload uses the standard FIT power channel. A dual-recording adapter must in
 - data/originals/: optional original files.
 
 The entire data/ directory is ignored by Git. Do not place real imports in examples/ or tests/. Settings affect only this app. Configure each athlete's own references.
+
+For repeated workouts, a local note can also carry `lap_hr_comparison`: an array of matching steps with `minutes`, `target_w`, `target_cadence_rpm`, and `block_1_hr`, `block_2_hr`, etc. Use actual recorded lap boundaries and preserve missing HR as null. Optional `dual_power_summary.blocks` entries contain `block`, `hr_bpm`, and `pedal_w` for the block summaries. These fields display a side-by-side HR table on the ride page and remain local. Do not populate measured values from workout targets. Ordinary RPE/intent edits preserve these extra note fields.

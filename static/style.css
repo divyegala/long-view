@@ -13,3 +13,4 @@ dialog{border:1px solid var(--border);border-radius:14px;padding:0;max-width:620
 .inline-control{display:inline-flex;margin:0 0 13px}.segmented{flex-wrap:wrap}.combined{white-space:nowrap}
 
 .chart.profile.load-profile{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;height:auto}.load-panel{min-width:0;border:1px solid var(--border);border-radius:8px;padding:12px}.load-panel h3{font-size:14px;margin:0}.load-panel p{font-size:11px;margin:3px 0 14px}.load-panel-chart{height:467px;min-width:0;position:relative}@media(max-width:1100px){.chart.profile.load-profile{grid-template-columns:1fr}}
+.lap-hr-table th,.lap-hr-table td{padding:12px 10px;font-variant-numeric:tabular-nums}.lap-hr-table td:not(:first-child),.lap-hr-table th:not(:first-child){text-align:center}.lap-hr-table tfoot td{font-weight:600;background:#fafbfe}.lap-hr-table small{font-size:11px}

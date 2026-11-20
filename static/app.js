@@ -180,6 +180,18 @@ function renderTimeline(a){
  $('#timeline-description').textContent=minutes(a.elapsed_seconds/60)+' elapsed · '+minutes(a.stop_seconds/60)+' in recording stops · '+(a.indoor?'Indoor':'Outdoor')+' intensity reference '+a.reference_ftp+' W';
  $('#timeline-helper').textContent=mode==='power'?'Shaded periods are stops. They remain on the elapsed clock at zero power and permit recovery automatically. The line shows 30-second average recorded power.':labels[mode]+' ('+units[mode]+'). This is an experimental within-ride workload proxy, not measured physiological fatigue. Every stop permits recovery; the fast and slow states recover at different rates.';
 }
+function renderLapComparison(note){
+ const rows=Array.isArray(note?.lap_hr_comparison)?note.lap_hr_comparison:[];
+ const keys=Array.from(new Set(rows.flatMap(r=>Object.keys(r).filter(k=>/^block_\d+_hr$/.test(k))))).sort((a,b)=>Number(a.split('_')[1])-Number(b.split('_')[1]));
+ const panel=$('#lap-hr-panel'),table=$('#lap-hr-table');panel.hidden=!rows.length||!keys.length;table.innerHTML='';if(panel.hidden)return;
+ const cell=value=>ok(value)?value.toFixed(1):'—';
+ let footer='';const blocks=note?.dual_power_summary?.blocks;
+ if(Array.isArray(blocks)){
+  const found=keys.map(k=>blocks.find(b=>b.block===Number(k.split('_')[1])));
+  footer='<tfoot><tr><th>Block mean HR</th>'+found.map(b=>'<td>'+cell(b?.hr_bpm)+'</td>').join('')+'</tr><tr><th>Pedal power (W)</th>'+found.map(b=>'<td>'+cell(b?.pedal_w)+'</td>').join('')+'</tr></tfoot>';
+ }
+ table.innerHTML='<table><thead><tr><th>Prescribed step</th>'+keys.map(k=>'<th>Block '+Number(k.split('_')[1])+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr><td><strong>'+esc(r.minutes)+' min · '+esc(r.target_w)+' W</strong><br><small>'+esc(r.target_cadence_rpm)+' rpm</small></td>'+keys.map(k=>'<td>'+cell(r[k])+'</td>').join('')+'</tr>').join('')+'</tbody>'+footer+'</table>';
+}
 function renderRide(){
  const ride=selected();if(!ride)return;const a=analysis(),base=cohort(ride);
  $('#ride-select').innerHTML=eligible().slice().reverse().map(r=>'<option value="'+esc(r.id)+'" '+(r.id===ride.id?'selected':'')+'>'+esc(fmtDate(r.start_local,true)+' · '+r.name)+'</option>').join('');
@@ -193,7 +205,7 @@ function renderRide(){
  $('#ride-observation').hidden=!ride.note?.observation;
  $('#ride-observation').textContent=ride.note?.observation||'';
  $('#ride-metrics').innerHTML=Object.keys(METRICS).map(k=>{const value=metricValue(a,k),c=compare(value,base.map(r=>metricValue(S.models.get(r.id),k)));const enough=c.n>=3,untested=easy&&ok(c.delta)&&c.delta<0;return metricCard(k,enough&&!untested?c.delta:null,METRICS[k].caption+' · '+(untested?'Endurance ride · capacity not tested':enough?'vs prior median · '+c.n+' comparison rides':c.n+' prior rides'),false,untested?'Not tested':!ok(value)?'Not observed':'More evidence');}).join('');
- renderProfile(a,base);renderDurability(a,base);renderPowerTime(a,base);renderTimeline(a);
+ renderLapComparison(ride.note);renderProfile(a,base);renderDurability(a,base);renderPowerTime(a,base);renderTimeline(a);
 }
 function renderLibrary(){
  const search=$('#search').value.toLowerCase(),rides=eligible().slice().reverse().filter(r=>(r.start_local+' '+r.name).toLowerCase().includes(search));

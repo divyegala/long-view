@@ -51,6 +51,11 @@
    <div id="ride-context" class="notice" hidden></div>
    <div id="ride-observation" class="notice" hidden></div>
    <div class="metrics" id="ride-metrics"></div>
+   <section class="panel" id="lap-hr-panel" hidden>
+    <div class="panel-heading"><div><h2>Repeated-block heart rate</h2><p>Matching steps side by side, using the recorded lap boundaries.</p></div></div>
+    <div class="table-wrap lap-hr-table" id="lap-hr-table"></div>
+    <p class="helper">Cells show mean HR in bpm. Step labels are prescribed power and cadence; the block summaries show actual mean pedal power. HR also reflects preceding work and takes time to respond to a step change.</p>
+   </section>
    <section class="panel">
     <div class="panel-heading"><div><h2>Where did this ride stand out?</h2><p>Power at each duration, relative to your preceding comparison rides.</p></div>
      <div class="segmented" id="curve-mode"><button data-mode="best" class="selected">Best</button><button data-mode="repeated">Repeated</button><button data-mode="late">Late</button><button data-mode="loaded">Under load</button></div></div>
